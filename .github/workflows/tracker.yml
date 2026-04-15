@@ -1,0 +1,79 @@
+name: Flight Price Tracker
+
+on:
+  schedule:
+    # 8 AM Toronto (EST = UTC-5 → 13:00 UTC)
+    # 6 PM Toronto (EST = UTC-5 → 23:00 UTC)
+    - cron: "0 13,23 * * *"
+  workflow_dispatch:   # allow manual trigger from the Actions UI
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90      # scraping 9+ routes can take a while
+
+    env:
+      ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+      GMAIL_USER:          ${{ secrets.GMAIL_USER }}
+      GMAIL_APP_PASSWORD:  ${{ secrets.GMAIL_APP_PASSWORD }}
+      FIRESTORE_KEY_PATH:  firestore-key.json
+      FIRESTORE_PROJECT:   ${{ secrets.FIRESTORE_PROJECT }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright + Chromium
+        run: |
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Write Firestore service-account key
+        run: echo '${{ secrets.FIRESTORE_KEY }}' > firestore-key.json
+
+      - name: Run flight tracker
+        run: python main.py
+
+      # ── Error notification ────────────────────────────────────────────────
+      - name: Send error email on failure
+        if: failure()
+        env:
+          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          python - <<'PYEOF'
+          import smtplib, os
+          from datetime import datetime
+          user = os.environ.get("GMAIL_USER", "")
+          pwd  = os.environ.get("GMAIL_APP_PASSWORD", "")
+          if not user or not pwd:
+              print("No Gmail creds — cannot send error email.")
+              raise SystemExit(0)
+          run_url = (
+              "https://github.com/${{ github.repository }}"
+              "/actions/runs/${{ github.run_id }}"
+          )
+          body = (
+              f"From: {user}\r\n"
+              f"To: {user}\r\n"
+              f"Subject: ❌ Flight Tracker Failed — {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}\r\n"
+              f"\r\n"
+              f"The flight tracker GitHub Actions run failed.\r\n"
+              f"View logs: {run_url}\r\n"
+          )
+          with smtplib.SMTP("smtp.gmail.com", 587) as s:
+              s.ehlo()
+              s.starttls()
+              s.login(user, pwd)
+              s.sendmail(user, [user], body)
+          print("Error email sent.")
+          PYEOF
