@@ -148,8 +148,11 @@ def _section_best_pick(best: dict, narrative: str) -> str:
     ret_date = best.get("return_date", "")
     gf_url = best.get("google_flights_url", "")
 
-    link_html = (
-        f'<a href="{gf_url}" style="color:#1a73e8">Search on Google Flights ↗</a>'
+    buy_btn = (
+        f'<a href="{gf_url}" target="_blank" '
+        f'style="display:inline-block;margin-top:14px;padding:12px 24px;'
+        f'background:#1a73e8;color:#fff;font-weight:bold;font-size:15px;'
+        f'text-decoration:none;border-radius:6px">🛒 Book on Google Flights →</a>'
         if gf_url else ""
     )
 
@@ -164,7 +167,7 @@ def _section_best_pick(best: dict, narrative: str) -> str:
     &nbsp;·&nbsp; {out_date} → {ret_date}
   </p>
   <p style="margin:12px 0 4px;font-style:italic;color:#333">{narrative}</p>
-  {link_html}
+  {buy_btn}
 </div>"""
 
 
@@ -346,8 +349,8 @@ def _fmt_duration(minutes: int) -> str:
 def _next_run_time() -> str:
     """Return estimated next scheduled run time string."""
     now = datetime.now()
-    if now.hour < 13:
-        nxt = now.replace(hour=18, minute=0, second=0, microsecond=0)
+    if now.hour < 19:
+        nxt = now.replace(hour=19, minute=0, second=0, microsecond=0)
     else:
-        nxt = (now + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
+        nxt = (now + timedelta(days=1)).replace(hour=7, minute=0, second=0, microsecond=0)
     return nxt.strftime("%A %b %d at %-I:%M %p")
