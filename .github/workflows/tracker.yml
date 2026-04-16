@@ -2,9 +2,9 @@ name: Flight Price Tracker
 
 on:
   schedule:
-    # 8 AM Toronto (EST = UTC-5 → 13:00 UTC)
-    # 6 PM Toronto (EST = UTC-5 → 23:00 UTC)
-    - cron: "0 13,23 * * *"
+    # 7 AM Toronto (EST = UTC-5 → 12:00 UTC)
+    # 7 PM Toronto (EST = UTC-5 → 00:00 UTC next day)
+    - cron: "0 0,12 * * *"
   workflow_dispatch:   # allow manual trigger from the Actions UI
 
 jobs:

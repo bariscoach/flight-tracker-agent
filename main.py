@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 async def main() -> None:
     logger.info("=== flight-tracker-agent starting ===")
     now = datetime.now()
-    is_morning = now.hour < 13   # 8 AM run is before noon Toronto time
+    is_morning = now.hour >= 6   # 7 AM run (12:00 UTC) vs 7 PM run (00:00 UTC)
 
     # ── 1. Build date ranges ─────────────────────────────────────────────────
     outbound_dates = build_date_range(config.OUTBOUND_DATE, config.OUTBOUND_FLEXIBILITY_DAYS)
