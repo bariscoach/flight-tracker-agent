@@ -13,10 +13,10 @@ ORIGINS = ["YYZ", "YHM", "YTZ"]
 DESTINATIONS = ["IST", "ESB", "SAW"]
 
 # ── Travel dates & flexibility ────────────────────────────────────────────────
-OUTBOUND_DATE = "2026-07-18"          # ±3 days → Jul 15–21
-RETURN_DATE = "2026-08-22"            # ±3 days → Aug 19–25
-OUTBOUND_FLEXIBILITY_DAYS = 3
-RETURN_FLEXIBILITY_DAYS = 3
+OUTBOUND_DATE = "2026-07-18"          # ±2 days → Jul 16–20
+RETURN_DATE = "2026-08-22"            # ±2 days → Aug 20–24
+OUTBOUND_FLEXIBILITY_DAYS = 2
+RETURN_FLEXIBILITY_DAYS = 2
 
 # ── Passengers ────────────────────────────────────────────────────────────────
 ADULTS = 1
@@ -35,13 +35,13 @@ HUB_AIRPORTS = [
     "SOF", "ARN", "HEL",
 ]
 # Limit active hub searches to top hubs to keep runtime reasonable
-ACTIVE_HUBS = HUB_AIRPORTS[:5]   # AMS, LHR, FRA, CDG, MUC
+ACTIVE_HUBS = HUB_AIRPORTS[:3]   # AMS, LHR, FRA
 
 # ── Positioning hubs (Porter / Air Canada feeder) ─────────────────────────────
 POSITIONING_HUBS = ["JFK", "EWR"]
 
 # ── Email ─────────────────────────────────────────────────────────────────────
-RECIPIENTS = ["baris@email.com", "elif@email.com"]   # ← update before first run
+RECIPIENTS = ["barishiz@gmail.com", "elifohiz@gmail.com"]   # ← update before first run
 
 # ── Claude ───────────────────────────────────────────────────────────────────
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"

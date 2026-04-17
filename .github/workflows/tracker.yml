@@ -10,7 +10,7 @@ on:
 jobs:
   track:
     runs-on: ubuntu-latest
-    timeout-minutes: 90      # scraping 9+ routes can take a while
+    timeout-minutes: 60      # ±2 days flexibility → ~45 min runtime
 
     env:
       ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
