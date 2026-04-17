@@ -1,31 +1,29 @@
 # ✈️ Flight Tracker Agent
 
-A personal flight price monitor that runs silently in the background on your Mac.
-It checks Google Flights twice a day, analyses deals with Claude AI, and emails you a
-rich HTML digest — completely free (no paid flight APIs, no cloud servers).
+A personal flight price monitor. Configure your routes and API keys in a browser UI,
+then hit **Run** whenever you want a fresh price check — it scrapes Google Flights,
+analyses deals with Claude AI, and emails you a rich HTML digest.
 
 ---
 
 ## How it works
 
 ```
-macOS LaunchAgent (7 AM + 7 PM)
+bash open_settings.sh  →  browser UI at localhost:5050
         │
-        ▼
-Playwright (headless Chrome)  ──►  Google Flights raw page text
+        ▼ click ▶ Run Now
         │
-        ▼
-Claude Haiku  ──►  ranked flights + best pick + narrative
+        ├── Playwright (headless Chrome) scrapes Google Flights
         │
-        ▼
-Gmail SMTP  ──►  HTML email digest with booking links
+        ├── Claude Haiku ranks deals + writes narrative
         │
-        ▼
-Firestore  ──►  price history + drop detection
+        ├── Gmail SMTP sends HTML digest with booking links
+        │
+        └── Firestore stores price history for trend detection
 ```
 
-**Why run locally?** Cloud servers (GitHub Actions, AWS, etc.) get blocked by Google's
-bot detection. Your home/laptop IP is treated as a normal browser — flights load fine.
+**Why run locally?** Cloud servers get blocked by Google's bot detection.
+Your home/laptop IP is treated as a normal browser — flights load fine.
 
 ---
 
@@ -35,10 +33,8 @@ bot detection. Your home/laptop IP is treated as a normal browser — flights lo
 - **Top-5 routes table** — price vs. yesterday trend (🟢↓ / 🔴↑)
 - **Cheapest date combo** — flexibility search across ±N days
 - **Separate-ticket deals** — hub routes that beat direct fares
-- **Positioning flights** — drive/fly to a nearby hub first
-- **Mistake fare alerts** — morning scan of deal sites
+- **Mistake fare alerts** — scans deal sites for Canada→destination errors
 - **Price history** — Firestore tracks every run; flags drops vs. baseline
-- **Settings UI** — browser-based form at `localhost:5050`, no config file editing
 
 ---
 
@@ -46,39 +42,38 @@ bot detection. Your home/laptop IP is treated as a normal browser — flights lo
 
 | Requirement | Notes |
 |---|---|
-| macOS | Tested on macOS 14+. Linux works too (replace LaunchAgent with cron). |
 | Python 3.11 | `brew install python@3.11` |
-| Anthropic API key | [console.anthropic.com](https://console.anthropic.com) — Claude Haiku is cheap (~$0.02/day) |
-| Gmail account | Needs a [Gmail App Password](https://myaccount.google.com/apppasswords) (not your login password) |
-| Google Cloud project | Free tier Firestore is sufficient |
+| Anthropic API key | [console.anthropic.com](https://console.anthropic.com) — Haiku costs ~$0.02/run |
+| Gmail account | Needs a [Gmail App Password](https://myaccount.google.com/apppasswords) |
+| Google Cloud project | Free-tier Firestore is sufficient |
 
 ---
 
-## Quick start
+## Setup
 
-### 1 — Clone and install dependencies
+### 1 — Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/flight-tracker-agent.git
+git clone https://github.com/bariscoach/flight-tracker-agent.git
 cd flight-tracker-agent
 python3.11 -m pip install -r requirements.txt
 playwright install chromium
 ```
 
-### 2 — Set up Firestore
+### 2 — Set up Firestore (one-time)
 
 1. Create a [Google Cloud project](https://console.cloud.google.com)
 2. Enable **Firestore** (Native mode)
-3. Create a service account with the **Cloud Datastore User** role
+3. Create a service account → role: **Cloud Datastore User**
 4. Download the JSON key → save as `firestore-key.json` in the project root
 
-### 3 — Open the Settings UI
+### 3 — Open the settings UI
 
 ```bash
 bash open_settings.sh
 ```
 
-This opens `http://localhost:5050` in your browser. Fill in:
+Your browser opens at `http://localhost:5050`. Fill in your details:
 
 | Field | What to enter |
 |---|---|
@@ -91,39 +86,64 @@ This opens `http://localhost:5050` in your browser. Fill in:
 | **Outbound / Return dates** | Your target travel window |
 | **Recipients** | Comma-separated emails to receive the digest |
 
-Click **Save Settings**, then **▶ Run Now** to test.
+Click **💾 Save Settings** then **▶ Run Now**.
 
-### 4 — Install the background scheduler (macOS)
+The log box at the bottom of the page updates every 10 seconds so you can
+watch the run in real time. A digest email arrives when it's done (~5–10 min).
+
+---
+
+## Running it again
+
+Any time you want a fresh price check:
 
 ```bash
+bash open_settings.sh   # opens the UI if it's not already open
+```
+
+Then click **▶ Run Now**.
+
+Or run directly from the terminal without opening the UI:
+
+```bash
+python3.11 main.py
+```
+
+---
+
+## Optional: run on a schedule (macOS)
+
+If you want it to run automatically without clicking anything, you can use
+macOS LaunchAgent to fire it at set times:
+
+```bash
+# Edit com.flighttracker.plist — replace YOUR_USERNAME with your macOS username
+# and adjust the python3.11 path if needed (run: which python3.11)
+
 cp com.flighttracker.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.flighttracker.plist
 ```
 
-The tracker now runs automatically at **7:00 AM** and **7:00 PM** every day,
-even when the Settings UI is closed.
+Default schedule: **7:00 AM** and **7:00 PM** daily.
+Edit `com.flighttracker.plist` to change the times.
 
-To stop it:
+To stop the schedule:
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.flighttracker.plist
 ```
 
-### 5 — (Optional) Linux / cron setup
-
+For Linux, use `cron` instead:
 ```bash
 crontab -e
-
-# Add these two lines (adjust path):
-0 7  * * * cd /path/to/flight-tracker-agent && python3.11 main.py >> logs/tracker.log 2>&1
-0 19 * * * cd /path/to/flight-tracker-agent && python3.11 main.py >> logs/tracker.log 2>&1
+# Add:
+0 7,19 * * * cd /path/to/flight-tracker-agent && python3.11 main.py >> logs/tracker.log 2>&1
 ```
 
 ---
 
 ## Configuration reference
 
-All settings live in `user_config.json` (created by the web UI, never committed to git).
-You can also use environment variables or a `.env` file — see `.env.example`.
+Settings are saved in `user_config.json` (never committed to git).
 
 | Key | Default | Description |
 |---|---|---|
@@ -137,19 +157,18 @@ You can also use environment variables or a `.env` file — see `.env.example`.
 | `CHILDREN` | `0` | Number of child passengers |
 | `CHILD_AGE` | `7` | Age of child (if children > 0) |
 | `MAX_TRAVEL_HOURS` | `20` | Skip itineraries longer than this (hours) |
-| `ACTIVE_HUBS_COUNT` | `3` | Hub airports to search (more = slower run) |
-| `RECIPIENTS` | `[]` | Email addresses to receive the digest |
+| `ACTIVE_HUBS_COUNT` | `3` | Hub airports to search (more = slower) |
+| `RECIPIENTS` | `[]` | Emails to receive the digest |
 
 ---
 
 ## Cost estimate
 
-| Service | Monthly cost |
+| Service | Per run |
 |---|---|
-| Claude Haiku (~60 API calls/day × 30 days) | ~$0.50–$1.00 |
-| Firestore (free tier) | $0 |
+| Claude Haiku (~60 API calls) | ~$0.02 |
+| Firestore | $0 (free tier) |
 | Gmail SMTP | $0 |
-| **Total** | **< $1/month** |
 
 ---
 
@@ -157,60 +176,42 @@ You can also use environment variables or a `.env` file — see `.env.example`.
 
 ```
 flight-tracker-agent/
-├── main.py                  # Async orchestrator
-├── config.py                # All settings (reads user_config.json → env vars → defaults)
+├── main.py                  # Orchestrator
+├── config.py                # Settings (reads user_config.json → env → defaults)
 ├── scraper/
 │   └── google_flights.py    # Playwright scraper
 ├── agent/
 │   └── analyzer.py          # Claude Haiku parsing + ranking
 ├── mailer/
-│   └── mailer.py            # HTML email builder + Gmail SMTP
+│   └── mailer.py            # HTML email + Gmail SMTP
 ├── data/
-│   └── firestore_client.py  # Price history storage
+│   └── firestore_client.py  # Firestore price history
 ├── web_ui/
-│   ├── app.py               # Flask settings server (localhost:5050)
+│   ├── app.py               # Settings UI server (localhost:5050)
 │   └── templates/
-│       └── index.html       # Settings form
-├── open_settings.sh         # One-click launcher for the settings UI
-├── com.flighttracker.plist  # macOS LaunchAgent schedule
-├── requirements.txt         # Python dependencies
-├── .env.example             # Template for environment variables
-└── logs/                    # Tracker run logs (gitignored)
+│       └── index.html       # Settings form + log viewer
+├── open_settings.sh         # Opens the UI in your browser
+├── com.flighttracker.plist  # Optional: macOS schedule
+├── requirements.txt
+└── .env.example
 ```
 
 ---
 
 ## Troubleshooting
 
-**No flights in email / empty digest**
-- Run `bash open_settings.sh`, click ▶ Run Now, then watch the log box.
-- Check that your destinations are valid IATA codes.
-- Google Flights works best on home/office IPs. Cloud/VPN IPs may be blocked.
+**Empty digest / no flights found**
+- Watch the log box in the UI while it runs.
+- Confirm destination IATA codes are valid (IST, ESB, SAW, AYT, etc.).
+- Google Flights works best on home/office IPs — VPN or cloud IPs may be blocked.
 
 **Email not arriving**
-- Confirm Gmail App Password is correct (not your login password).
+- Use a Gmail App Password, not your regular login password.
+- Gmail 2FA must be enabled before App Passwords work.
 - Check `logs/tracker.log` for SMTP errors.
-- Gmail 2FA must be enabled (required for App Passwords).
 
 **Claude API errors**
-- Verify your Anthropic API key has credits at [console.anthropic.com](https://console.anthropic.com).
-- Rate limit errors are handled automatically with a built-in delay.
-
-**LaunchAgent not running**
-```bash
-launchctl list | grep flighttracker   # should show com.flighttracker
-tail -50 logs/tracker.log             # see what happened on last run
-```
-
----
-
-## Contributing
-
-Pull requests welcome. Key areas for improvement:
-- Additional departure cities / regions
-- One-way trip support
-- Price alert thresholds (only email when price drops X%)
-- Windows support (Task Scheduler instead of LaunchAgent)
+- Check your API key at [console.anthropic.com](https://console.anthropic.com).
 
 ---
 
