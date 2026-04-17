@@ -9,6 +9,7 @@ Claude Haiku integration for:
 
 import json
 import logging
+import time
 from typing import Any
 
 import anthropic
@@ -207,6 +208,7 @@ Rules:
 """
 
     try:
+        time.sleep(1.5)  # stay under 50 RPM rate limit
         resp = _client.messages.create(
             model=config.CLAUDE_MODEL,
             max_tokens=2048,
