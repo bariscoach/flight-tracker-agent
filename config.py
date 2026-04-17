@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Routes ────────────────────────────────────────────────────────────────────
-ORIGINS = ["YYZ", "YHM", "YTZ"]
+ORIGINS = ["YYZ"]
 DESTINATIONS = ["IST", "ESB", "SAW"]
 
 # ── Travel dates & flexibility ────────────────────────────────────────────────
