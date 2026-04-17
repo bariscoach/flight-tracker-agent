@@ -69,16 +69,20 @@ def _build_html(
     # 2. Best Pick card
     best = analysis.get("best_pick", {})
     narrative = analysis.get("narrative", "")
-    if best:
-        sections.append(_section_best_pick(best, narrative))
-
-    # 3. Top-5 routes table
     ranked = analysis.get("ranked_flights", [])
-    if ranked:
-        sections.append(_section_top5_table(ranked, yesterday_prices))
+
+    if not best and not ranked:
+        sections.append(_section_no_data(narrative))
+    else:
+        if best:
+            sections.append(_section_best_pick(best, narrative))
+
+        # 3. Top-5 routes table
+        if ranked:
+            sections.append(_section_top5_table(ranked, yesterday_prices))
 
     # 4. Cheapest date combo callout
-    cdc = analysis.get("cheapest_date_combo", {})
+    cdc = analysis.get("cheapest_date_combo", {}) if ranked else {}
     if cdc and cdc.get("outbound") != config.OUTBOUND_DATE:
         sections.append(_section_cheapest_dates(cdc))
 
@@ -182,11 +186,11 @@ def _section_top5_table(flights: list[dict], yesterday: dict) -> str:
         yest_price = yesterday.get(f"{f.get('origin','?')}-{f.get('destination','?')}")
         if yest_price:
             if price < yest_price * 0.99:
-                trend = "🟢"
+                trend = "🟢↓"
             elif price > yest_price * 1.01:
-                trend = "↑"
+                trend = "🔴↑"
             else:
-                trend = "↓"
+                trend = "→"
             trend_cell = f"${yest_price:,.0f} {trend}"
         else:
             trend_cell = "—"
@@ -265,6 +269,18 @@ def _section_positioning(pos: dict) -> str:
   </p>
   <p style="margin:4px 0;color:#555;font-size:13px">
     ⚠️ Positioning legs are on separate tickets.
+  </p>
+</div>"""
+
+
+def _section_no_data(narrative: str) -> str:
+    msg = narrative or "No flight data could be retrieved in this run."
+    return f"""
+<div style="background:#fff3e0;border-left:5px solid #ff9800;padding:20px;margin:16px 0;border-radius:4px">
+  <h2 style="margin:0 0 8px;color:#e65100">⚠️ No Flight Data Available</h2>
+  <p style="margin:4px 0;color:#555">{msg}</p>
+  <p style="margin:8px 0 0;color:#888;font-size:13px">
+    The scraper may have been blocked or returned no results. The next scheduled run will try again.
   </p>
 </div>"""
 
