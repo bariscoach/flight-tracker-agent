@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>✈️ Flight Tracker Settings</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+      padding: 32px 16px 64px;
+    }
+
+    .container { max-width: 760px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header h1 { font-size: 22px; font-weight: 700; color: #1a73e8; }
+    header p  { font-size: 13px; color: #718096; margin-top: 2px; }
+
+    .run-btn {
+      padding: 10px 22px;
+      background: #34a853;
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .run-btn:hover { background: #2d924a; }
+
+    .flash {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .flash.success { background: #e6f4ea; color: #1e7e34; border-left: 4px solid #34a853; }
+    .flash.info    { background: #e8f0fe; color: #1a73e8; border-left: 4px solid #1a73e8; }
+    .flash.error   { background: #fce8e6; color: #c5221f; border-left: 4px solid #ea4335; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid.single { grid-template-columns: 1fr; }
+    @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 5px;
+    }
+    label .hint {
+      font-weight: 400;
+      color: #a0aec0;
+      font-size: 12px;
+      margin-left: 4px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="date"],
+    input[type="number"],
+    input[type="email"] {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 14px;
+      color: #1a202c;
+      transition: border-color .15s;
+      background: #fff;
+    }
+    input:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 3px rgba(26,115,232,.12);
+    }
+
+    .save-bar {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+    .save-btn {
+      padding: 11px 28px;
+      background: #1a73e8;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .save-btn:hover { background: #1558b0; }
+
+    .log-section { margin-top: 28px; }
+    .log-section h2 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #4a5568;
+      margin-bottom: 10px;
+    }
+    #log-box {
+      background: #1a202c;
+      color: #a0ec8a;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12px;
+      padding: 16px;
+      border-radius: 10px;
+      height: 260px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-refresh {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #718096;
+    }
+    .log-refresh a { color: #1a73e8; cursor: pointer; text-decoration: none; }
+
+    .schedule-note {
+      font-size: 13px;
+      color: #718096;
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 0;
+    }
+    .schedule-note strong { color: #4a5568; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div>
+      <h1>✈️ Flight Tracker</h1>
+      <p>Running locally on your Mac — residential IP, no bot blocks</p>
+    </div>
+    <form action="/run" method="post">
+      <button class="run-btn" type="submit">▶ Run Now</button>
+    </form>
+  </header>
+
+  {% for msg, category in get_flashed_messages(with_categories=true) %}
+    <div class="flash {{ category }}">{{ msg }}</div>
+  {% endfor %}
+
+  <form action="/save" method="post">
+
+    <!-- API Keys -->
+    <div class="card">
+      <h2>🔑 API Keys</h2>
+      <div class="grid">
+        <div>
+          <label>Anthropic API Key</label>
+          <input type="password" name="anthropic_api_key"
+                 value="{{ cfg.ANTHROPIC_API_KEY }}"
+                 placeholder="sk-ant-…">
+        </div>
+        <div>
+          <label>Gmail Address</label>
+          <input type="text" name="gmail_user"
+                 value="{{ cfg.GMAIL_USER }}"
+                 placeholder="you@gmail.com">
+        </div>
+        <div>
+          <label>Gmail App Password <span class="hint">(not your login password)</span></label>
+          <input type="password" name="gmail_app_password"
+                 value="{{ cfg.GMAIL_APP_PASSWORD }}"
+                 placeholder="xxxx xxxx xxxx xxxx">
+        </div>
+        <div>
+          <label>Firestore Project ID</label>
+          <input type="text" name="firestore_project"
+                 value="{{ cfg.FIRESTORE_PROJECT }}"
+                 placeholder="flight-tracker">
+        </div>
+        <div>
+          <label>Firestore Key File Path</label>
+          <input type="text" name="firestore_key_path"
+                 value="{{ cfg.FIRESTORE_KEY_PATH }}"
+                 placeholder="firestore-key.json">
+        </div>
+      </div>
+    </div>
+
+    <!-- Routes -->
+    <div class="card">
+      <h2>🗺 Routes</h2>
+      <div class="grid">
+        <div>
+          <label>Origin Airports <span class="hint">comma-separated IATA</span></label>
+          <input type="text" name="origins"
+                 value="{{ cfg._origins_str }}"
+                 placeholder="YYZ, YUL">
+        </div>
+        <div>
+          <label>Destination Airports <span class="hint">comma-separated IATA</span></label>
+          <input type="text" name="destinations"
+                 value="{{ cfg._destinations_str }}"
+                 placeholder="IST, ESB, SAW, AYT">
+        </div>
+      </div>
+    </div>
+
+    <!-- Dates -->
+    <div class="card">
+      <h2>📅 Travel Dates</h2>
+      <div class="grid">
+        <div>
+          <label>Outbound Date</label>
+          <input type="date" name="outbound_date" value="{{ cfg.OUTBOUND_DATE }}">
+        </div>
+        <div>
+          <label>Return Date</label>
+          <input type="date" name="return_date" value="{{ cfg.RETURN_DATE }}">
+        </div>
+        <div>
+          <label>Outbound Flexibility <span class="hint">±days</span></label>
+          <input type="number" name="outbound_flex"
+                 value="{{ cfg.OUTBOUND_FLEXIBILITY_DAYS }}" min="0" max="7">
+        </div>
+        <div>
+          <label>Return Flexibility <span class="hint">±days</span></label>
+          <input type="number" name="return_flex"
+                 value="{{ cfg.RETURN_FLEXIBILITY_DAYS }}" min="0" max="7">
+        </div>
+      </div>
+    </div>
+
+    <!-- Passengers -->
+    <div class="card">
+      <h2>👥 Passengers</h2>
+      <div class="grid">
+        <div>
+          <label>Adults</label>
+          <input type="number" name="adults" value="{{ cfg.ADULTS }}" min="1" max="9">
+        </div>
+        <div>
+          <label>Children</label>
+          <input type="number" name="children" value="{{ cfg.CHILDREN }}" min="0" max="8">
+        </div>
+        <div>
+          <label>Child Age <span class="hint">if children > 0</span></label>
+          <input type="number" name="child_age" value="{{ cfg.CHILD_AGE }}" min="2" max="17">
+        </div>
+      </div>
+    </div>
+
+    <!-- Email + Advanced -->
+    <div class="card">
+      <h2>📧 Email & Advanced</h2>
+      <div class="grid">
+        <div>
+          <label>Email Recipients <span class="hint">comma-separated</span></label>
+          <input type="text" name="recipients"
+                 value="{{ cfg._recipients_str }}"
+                 placeholder="you@gmail.com, partner@gmail.com">
+        </div>
+        <div>
+          <label>Max Travel Time <span class="hint">hours (one-way)</span></label>
+          <input type="number" name="max_travel_hours"
+                 value="{{ cfg.MAX_TRAVEL_HOURS }}" min="5" max="40">
+        </div>
+        <div>
+          <label>Active Hub Airports <span class="hint">count (1-13)</span></label>
+          <input type="number" name="active_hubs_count"
+                 value="{{ cfg.ACTIVE_HUBS_COUNT }}" min="1" max="13">
+        </div>
+      </div>
+    </div>
+
+    <!-- Schedule note -->
+    <div class="schedule-note">
+      <strong>Schedule:</strong> Runs automatically at <strong>7:00 AM</strong> and
+      <strong>7:00 PM</strong> daily via macOS LaunchAgent (runs even when this settings
+      page is closed). Use <strong>▶ Run Now</strong> above to trigger immediately.
+    </div>
+
+    <div class="save-bar" style="margin-top:20px">
+      <button class="save-btn" type="submit">💾 Save Settings</button>
+    </div>
+
+  </form>
+
+  <!-- Logs -->
+  <div class="log-section">
+    <h2>📋 Recent Logs</h2>
+    <div id="log-box">Loading…</div>
+    <p class="log-refresh">
+      <a onclick="refreshLogs()">↻ Refresh</a>
+      &nbsp;·&nbsp; Auto-refreshes every 10s while tracker is running
+    </p>
+  </div>
+
+</div>
+
+<script>
+  async function refreshLogs() {
+    try {
+      const r = await fetch('/logs');
+      const text = await r.text();
+      const box = document.getElementById('log-box');
+      box.textContent = text || 'No logs yet.';
+      box.scrollTop = box.scrollHeight;
+    } catch(e) {
+      document.getElementById('log-box').textContent = 'Could not load logs.';
+    }
+  }
+  refreshLogs();
+  setInterval(refreshLogs, 10000);
+</script>
+</body>
+</html>
