@@ -217,6 +217,7 @@ async def _scrape_one(
         # Extra settle time for JS rendering
         await asyncio.sleep(config.SCRAPER_RESULTS_WAIT_MS / 1000)
         text = await _extract_text(page)
+        logger.info(f"Extracted {len(text)} chars | preview: {text[:200]!r}")
         return text or None
     except Exception as exc:
         logger.error(f"Scrape failed {origin}→{destination}: {exc}")
