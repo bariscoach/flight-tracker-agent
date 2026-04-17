@@ -76,7 +76,7 @@ ACTIVE_HUBS = HUB_AIRPORTS[:_int("ACTIVE_HUBS_COUNT", 3)]
 POSITIONING_HUBS = ["JFK", "EWR"]
 
 # ── Email ─────────────────────────────────────────────────────────────────────
-RECIPIENTS = _list("RECIPIENTS", ["barishiz@gmail.com", "elifohiz@gmail.com"])
+RECIPIENTS = _list("RECIPIENTS", [])  # set via web UI or RECIPIENTS env var
 
 # ── Claude ───────────────────────────────────────────────────────────────────
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"

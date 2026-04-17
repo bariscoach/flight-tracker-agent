@@ -1,91 +1,155 @@
-# ✈️ flight-tracker-agent
+# ✈️ Flight Tracker Agent
 
-Twice-daily flight price tracker for **YYZ / YHM / YTZ → IST / ESB / SAW** (Turkey).
+A personal flight price monitor that runs silently in the background on your Mac.
+It checks Google Flights twice a day, analyses deals with Claude AI, and emails you a
+rich HTML digest — completely free (no paid flight APIs, no cloud servers).
 
-Runs via **GitHub Actions**, scrapes **Google Flights** with Playwright, analyses results with **Claude Haiku**, stores history in **Firestore**, and emails a rich HTML digest.
+---
+
+## How it works
+
+```
+macOS LaunchAgent (7 AM + 7 PM)
+        │
+        ▼
+Playwright (headless Chrome)  ──►  Google Flights raw page text
+        │
+        ▼
+Claude Haiku  ──►  ranked flights + best pick + narrative
+        │
+        ▼
+Gmail SMTP  ──►  HTML email digest with booking links
+        │
+        ▼
+Firestore  ──►  price history + drop detection
+```
+
+**Why run locally?** Cloud servers (GitHub Actions, AWS, etc.) get blocked by Google's
+bot detection. Your home/laptop IP is treated as a normal browser — flights load fine.
 
 ---
 
 ## Features
 
-| Feature | Detail |
-|---------|--------|
-| Routes | All 3 × 3 origin→destination combos |
-| Flexibility | Outbound ±3 days (Jul 15–21), Return ±3 days (Aug 19–25) |
-| Search types | Direct + 1-stop · Hub separate-ticket · Positioning via JFK/EWR |
-| Analysis | Claude Haiku ranks by value score (price 60% + time 40%) |
-| Price history | Firestore — detects drops, shows ↑↓🟢 trend vs yesterday |
-| Mistake fares | Morning scan of secretflying.com + airfarewatchdog.com |
-| Schedule | 8 AM + 6 PM Toronto (GitHub Actions cron) |
-| Email | HTML digest with best pick, top-5 table, date-combo callout |
+- **Best pick card** — top deal with a direct Google Flights booking button
+- **Top-5 routes table** — price vs. yesterday trend (🟢↓ / 🔴↑)
+- **Cheapest date combo** — flexibility search across ±N days
+- **Separate-ticket deals** — hub routes that beat direct fares
+- **Positioning flights** — drive/fly to a nearby hub first
+- **Mistake fare alerts** — morning scan of deal sites
+- **Price history** — Firestore tracks every run; flags drops vs. baseline
+- **Settings UI** — browser-based form at `localhost:5050`, no config file editing
 
 ---
 
-## Quick start (local)
+## Requirements
 
-### Prerequisites
+| Requirement | Notes |
+|---|---|
+| macOS | Tested on macOS 14+. Linux works too (replace LaunchAgent with cron). |
+| Python 3.11 | `brew install python@3.11` |
+| Anthropic API key | [console.anthropic.com](https://console.anthropic.com) — Claude Haiku is cheap (~$0.02/day) |
+| Gmail account | Needs a [Gmail App Password](https://myaccount.google.com/apppasswords) (not your login password) |
+| Google Cloud project | Free tier Firestore is sufficient |
+
+---
+
+## Quick start
+
+### 1 — Clone and install dependencies
 
 ```bash
+git clone https://github.com/YOUR_USERNAME/flight-tracker-agent.git
+cd flight-tracker-agent
 python3.11 -m pip install -r requirements.txt
 playwright install chromium
 ```
 
-### Environment variables
+### 2 — Set up Firestore
+
+1. Create a [Google Cloud project](https://console.cloud.google.com)
+2. Enable **Firestore** (Native mode)
+3. Create a service account with the **Cloud Datastore User** role
+4. Download the JSON key → save as `firestore-key.json` in the project root
+
+### 3 — Open the Settings UI
 
 ```bash
-cp .env.example .env
-# Fill in ANTHROPIC_API_KEY, GMAIL_USER, GMAIL_APP_PASSWORD,
-# FIRESTORE_KEY_PATH, FIRESTORE_PROJECT
+bash open_settings.sh
 ```
 
-### Firestore setup
+This opens `http://localhost:5050` in your browser. Fill in:
 
-1. Create a GCP project and enable the Firestore API.
-2. Create a service account with **Cloud Datastore User** role.
-3. Download the JSON key → save as `firestore-key.json` (or set `FIRESTORE_KEY_PATH`).
-4. Set `FIRESTORE_PROJECT` to your GCP project ID.
+| Field | What to enter |
+|---|---|
+| **Anthropic API Key** | Your `sk-ant-…` key |
+| **Gmail Address** | The Gmail account that sends the digest |
+| **Gmail App Password** | 16-character app password from Google |
+| **Firestore Project ID** | Your GCP project ID |
+| **Origin airports** | e.g. `YYZ` (IATA codes, comma-separated) |
+| **Destinations** | e.g. `IST, ESB, SAW, AYT` |
+| **Outbound / Return dates** | Your target travel window |
+| **Recipients** | Comma-separated emails to receive the digest |
 
-The agent works without Firestore (logs a warning and skips price history).
+Click **Save Settings**, then **▶ Run Now** to test.
 
-### Run
+### 4 — Install the background scheduler (macOS)
 
 ```bash
-python main.py
+cp com.flighttracker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.flighttracker.plist
+```
+
+The tracker now runs automatically at **7:00 AM** and **7:00 PM** every day,
+even when the Settings UI is closed.
+
+To stop it:
+```bash
+launchctl unload ~/Library/LaunchAgents/com.flighttracker.plist
+```
+
+### 5 — (Optional) Linux / cron setup
+
+```bash
+crontab -e
+
+# Add these two lines (adjust path):
+0 7  * * * cd /path/to/flight-tracker-agent && python3.11 main.py >> logs/tracker.log 2>&1
+0 19 * * * cd /path/to/flight-tracker-agent && python3.11 main.py >> logs/tracker.log 2>&1
 ```
 
 ---
 
-## GitHub Actions setup
+## Configuration reference
 
-### 1. Fork / push this repo to GitHub
+All settings live in `user_config.json` (created by the web UI, never committed to git).
+You can also use environment variables or a `.env` file — see `.env.example`.
 
-```bash
-git init
-git add -A
-git commit -m "initial commit"
-git remote add origin git@github.com:bariscoach/flight-tracker-agent.git
-git push -u origin main
-```
+| Key | Default | Description |
+|---|---|---|
+| `ORIGINS` | `["YYZ"]` | Departure airport IATA codes |
+| `DESTINATIONS` | `["IST","ESB","SAW"]` | Arrival airport IATA codes |
+| `OUTBOUND_DATE` | — | Target outbound date `YYYY-MM-DD` |
+| `RETURN_DATE` | — | Target return date `YYYY-MM-DD` |
+| `OUTBOUND_FLEXIBILITY_DAYS` | `2` | Search ±N days around outbound date |
+| `RETURN_FLEXIBILITY_DAYS` | `2` | Search ±N days around return date |
+| `ADULTS` | `1` | Number of adult passengers |
+| `CHILDREN` | `0` | Number of child passengers |
+| `CHILD_AGE` | `7` | Age of child (if children > 0) |
+| `MAX_TRAVEL_HOURS` | `20` | Skip itineraries longer than this (hours) |
+| `ACTIVE_HUBS_COUNT` | `3` | Hub airports to search (more = slower run) |
+| `RECIPIENTS` | `[]` | Email addresses to receive the digest |
 
-### 2. Add repository secrets
+---
 
-Go to **Settings → Secrets and variables → Actions → New repository secret** for each:
+## Cost estimate
 
-| Secret | Value |
-|--------|-------|
-| `ANTHROPIC_API_KEY` | Your Anthropic API key |
-| `GMAIL_USER` | Gmail address used to send emails |
-| `GMAIL_APP_PASSWORD` | Gmail [App Password](https://support.google.com/accounts/answer/185833) |
-| `FIRESTORE_KEY` | Full JSON content of your service-account key file |
-| `FIRESTORE_PROJECT` | GCP project ID |
-
-### 3. Enable Actions
-
-The workflow at `.github/workflows/tracker.yml` runs automatically at:
-- **13:00 UTC** → 8 AM Toronto (EST) / 9 AM (EDT)
-- **23:00 UTC** → 6 PM Toronto (EST) / 7 PM (EDT)
-
-You can also trigger it manually from the **Actions** tab → **Run workflow**.
+| Service | Monthly cost |
+|---|---|
+| Claude Haiku (~60 API calls/day × 30 days) | ~$0.50–$1.00 |
+| Firestore (free tier) | $0 |
+| Gmail SMTP | $0 |
+| **Total** | **< $1/month** |
 
 ---
 
@@ -93,80 +157,60 @@ You can also trigger it manually from the **Actions** tab → **Run workflow**.
 
 ```
 flight-tracker-agent/
-├── .github/
-│   └── workflows/
-│       └── tracker.yml        # cron + Playwright CI
+├── main.py                  # Async orchestrator
+├── config.py                # All settings (reads user_config.json → env vars → defaults)
 ├── scraper/
-│   └── google_flights.py      # Playwright scraper
+│   └── google_flights.py    # Playwright scraper
 ├── agent/
-│   └── analyzer.py            # Claude Haiku parser + ranker
-├── mailer/                    # Named 'mailer/' (not 'email/') to avoid
-│   └── mailer.py              #   shadowing Python's stdlib email package
+│   └── analyzer.py          # Claude Haiku parsing + ranking
+├── mailer/
+│   └── mailer.py            # HTML email builder + Gmail SMTP
 ├── data/
-│   └── firestore_client.py    # Firestore price history
-├── main.py                    # Orchestrator
-├── config.py                  # All constants — edit here only
-├── requirements.txt
-├── .env.example
-├── CLAUDE.md
-└── README.md
+│   └── firestore_client.py  # Price history storage
+├── web_ui/
+│   ├── app.py               # Flask settings server (localhost:5050)
+│   └── templates/
+│       └── index.html       # Settings form
+├── open_settings.sh         # One-click launcher for the settings UI
+├── com.flighttracker.plist  # macOS LaunchAgent schedule
+├── requirements.txt         # Python dependencies
+├── .env.example             # Template for environment variables
+└── logs/                    # Tracker run logs (gitignored)
 ```
-
-> **Note:** The email directory is named `mailer/` rather than `email/` because
-> Python's `smtplib` module internally imports `email.utils`, `email.mime`, etc.
-> from the standard library. A local `email/` package would shadow those and
-> cause `smtplib` to break.
-
----
-
-## Configuration (`config.py`)
-
-Key values you may want to tweak before running:
-
-```python
-ORIGINS            = ["YYZ", "YHM", "YTZ"]
-DESTINATIONS       = ["IST", "ESB", "SAW"]
-OUTBOUND_DATE      = "2026-07-18"   # ±3 days
-RETURN_DATE        = "2026-08-22"   # ±3 days
-RECIPIENTS         = ["baris@email.com", "elif@email.com"]  # ← update this!
-ACTIVE_HUBS        = HUB_AIRPORTS[:5]   # AMS, LHR, FRA, CDG, MUC
-MAX_TRAVEL_HOURS   = 20
-```
-
----
-
-## Email format
-
-1. 🚨 **Mistake Fare Alert** — morning run only, if deals found
-2. ⭐ **Best Pick card** — highlighted with Claude's narrative
-3. 📋 **Top 5 routes table** — airline · duration · stops · price (CAD) · vs yesterday (↑↓🟢)
-4. 📅 **Cheapest date combo** — if different from original dates, shows saving
-5. 🎫 **Separate-ticket deal** — if combined legs are cheaper than a single itinerary
-6. 🛫 **Positioning flight option** — YYZ→JFK/EWR + JFK/EWR→destination (≤20 h)
-7. Footer — next check time · passenger info
-
----
-
-## Secrets reference
-
-| Variable | Where used |
-|----------|-----------|
-| `ANTHROPIC_API_KEY` | Claude Haiku API calls |
-| `GMAIL_USER` | SMTP login + From address |
-| `GMAIL_APP_PASSWORD` | SMTP authentication |
-| `FIRESTORE_KEY` | Service-account JSON (GitHub secret, written to file in CI) |
-| `FIRESTORE_PROJECT` | GCP project ID for Firestore |
 
 ---
 
 ## Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| No flights in email | Google Flights DOM may have changed; check `SCRAPER_RESULTS_WAIT_MS` in `config.py` |
-| SMTP error | Ensure 2-FA is on and you're using a Gmail App Password (not your main password) |
-| Firestore error | Check service-account JSON is valid and has Datastore User role |
-| Playwright timeout | Increase `SCRAPER_PAGE_TIMEOUT_MS` in `config.py` |
+**No flights in email / empty digest**
+- Run `bash open_settings.sh`, click ▶ Run Now, then watch the log box.
+- Check that your destinations are valid IATA codes.
+- Google Flights works best on home/office IPs. Cloud/VPN IPs may be blocked.
+
+**Email not arriving**
+- Confirm Gmail App Password is correct (not your login password).
+- Check `logs/tracker.log` for SMTP errors.
+- Gmail 2FA must be enabled (required for App Passwords).
+
+**Claude API errors**
+- Verify your Anthropic API key has credits at [console.anthropic.com](https://console.anthropic.com).
+- Rate limit errors are handled automatically with a built-in delay.
+
+**LaunchAgent not running**
+```bash
+launchctl list | grep flighttracker   # should show com.flighttracker
+tail -50 logs/tracker.log             # see what happened on last run
+```
+
+---
+
+## Contributing
+
+Pull requests welcome. Key areas for improvement:
+- Additional departure cities / regions
+- One-way trip support
+- Price alert thresholds (only email when price drops X%)
+- Windows support (Task Scheduler instead of LaunchAgent)
 
 ---
 
